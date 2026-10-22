@@ -15,6 +15,7 @@ one.
 | [Daytona](https://www.daytona.io/) | ✓ | ✓ | ✓ | ✓ |
 | [E2B](https://e2b.dev/) | ✓ | | | ✓ |
 | [Modal](https://modal.com/) | ✓ | | | ✓ |
+| [Novita](https://docs.novita.ai/) | ✓ | | | ✓ |
 
 The rest of this page is how to set each provider up. Its SDK is installed per
 recipe; the recipe README has that line.
@@ -77,3 +78,30 @@ For OpenEnv TB2, `cpus` and `memory_mb` from each task's `task.toml` become
 Modal resource requests, not hard limits. They preserve the task's guaranteed
 resource contract while still allowing the sandbox to burst above the request
 when its host has spare capacity.
+
+## Novita
+
+```bash
+mkdir -p ~/.config/novita && echo <key> > ~/.config/novita/api_key   # or export NOVITA_API_KEY
+```
+
+With nothing else set, the SDK talks to the `us-phx-1` region (the current
+one, with the full feature set). `NOVITA_DOMAIN=sandbox.novita.ai` selects the
+legacy `us-virginia-1` region; `NOVITA_API_URL` and `NOVITA_SANDBOX_URL`
+override the two endpoints for an internal deployment.
+
+A sandbox's lifetime is capped at one hour per `set_timeout` unless it was
+created with Novita's `long_running` marker. The OpenEnv recipe stays under
+that cap by re-arming a shorter TTL from a keepalive thread, so a longer
+episode needs no marker; Harbor's own Novita environment sets its lifetime
+itself.
+
+Templates are built per task, sized from each task's `task.toml`, and the
+build runs as root (Novita's template parser otherwise defaults to an
+unprivileged user, which the TB2 recipe's `apt-get` layers fail under).
+Harbor reaches Novita through the pinned harbor fork's own
+`EnvironmentType.NOVITA` (`HARBOR_ENV_TYPE=novita`); OpenEnv through the
+`tb2_sandbox_novita` materialization of the TB2 recipe
+(`OPENENV_SANDBOX_BACKEND=novita`). `scripts/sandbox_smoke/run.py --connector
+harbor --backend novita` and `examples/experimental/openenv/scan_golden.py`
+are the golden episodes for the two connectors.

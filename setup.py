@@ -69,6 +69,11 @@ setup(
         "modal": [
             "modal>=1.5.5",
         ],
+        # the openenv novita sandbox backend, imported only when that backend is
+        # selected; 2.0.7 is the Template/Sandbox surface the recipe is written against
+        "novita": [
+            "novita-sandbox>=2.0.7",
+        ],
     },
     python_requires=">=3.10",
     classifiers=[
