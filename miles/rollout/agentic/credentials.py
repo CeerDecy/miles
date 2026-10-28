@@ -84,13 +84,8 @@ PROVIDER_CREDENTIALS = {
         "provision_hint": "mkdir -p ~/.config/novita && echo <key> > ~/.config/novita/api_key",
         "sdk": "novita_sandbox",
         "sdk_hint": "pip install -e '<miles>[novita]'",
-        # 2.0.7 is the release whose Template/Sandbox surface the openenv
-        # materialization was written against (Template.exists, Sandbox.create
-        # network=, the 1 h Hobby ceiling on set_timeout).
         "sdk_min_version": "2.0.7",
-        # NOVITA_DOMAIN selects the region (unset: us-phx-1, the v2 region);
-        # NOVITA_API_URL / NOVITA_SANDBOX_URL override the endpoints for an
-        # internal deployment. All read by the SDK itself.
+        # region (NOVITA_DOMAIN) and endpoint overrides, read by the SDK itself
         "forward": ("NOVITA_DOMAIN", "NOVITA_API_URL", "NOVITA_SANDBOX_URL"),
         "target": ("NOVITA_DOMAIN", "region domain", "us-phx-1.sandbox.novita.ai (default)"),
     },

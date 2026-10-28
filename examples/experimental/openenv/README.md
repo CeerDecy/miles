@@ -130,9 +130,7 @@ limit above, Modal takes registry credentials directly: hand
 ### Novita
 
 Builds one **named template** per task, like E2B, and starts every episode's
-sandbox from it. The template's start command is pinned to a keepalive so the
-sandbox comes up idle with port 8000 free; the env server is exec'd per
-episode, so its runtime knobs stay runtime.
+sandbox from it.
 
 ```bash
 pip install -e '<miles>[novita]'   # novita-sandbox>=2.0.7
@@ -140,19 +138,14 @@ export OPENENV_TB2_TASKS_DIR=/workspace/terminal-bench-2
 OPENENV_SANDBOX_BACKEND=novita python run-openenv-tbench2.py
 ```
 
-Templates can be built ahead of the run, which is optional (the first episode
-of a task builds it inline) but keeps that build out of a create-concurrency
-slot:
+As with E2B, templates can be built ahead of the run:
 
 ```bash
 python tb2_sandbox_novita.py --tasks-dir /workspace/terminal-bench-2 --all
 ```
 
-Novita caps a sandbox's lifetime at one hour per `set_timeout` on accounts
-without its `long_running` marker; `OPENENV_NOVITA_SANDBOX_TTL_S` is a
-keepalive window re-armed from a thread, not an episode ceiling, so it stays
-under that cap. For the Docker Hub limit above, `Template.from_image` takes
-`username` / `password` for a private registry; the recipe pulls anonymously.
+For the Docker Hub limit above, `Template.from_image` takes `username` /
+`password` for a private registry; the recipe pulls anonymously.
 
 ### Alternative: one shared env server
 

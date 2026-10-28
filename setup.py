@@ -70,7 +70,7 @@ setup(
             "modal>=1.5.5",
         ],
         # the openenv novita sandbox backend, imported only when that backend is
-        # selected; 2.0.7 is the Template/Sandbox surface the recipe is written against
+        # selected; 2.0.7 is the release the recipe was written against
         "novita": [
             "novita-sandbox>=2.0.7",
         ],

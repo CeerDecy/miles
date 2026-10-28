@@ -60,11 +60,8 @@ logger = logging.getLogger(__name__)
 def _is_throttle_error(exc: BaseException) -> bool:
     """True when a sandbox create failed only because Novita would not seat it yet.
 
-    The SDK types HTTP 429 as RateLimitException; the text match covers the
-    same condition surfacing as a message, plus the account's sandbox quota
-    (a hit concurrent-sandbox ceiling is transient in the same way, and an
-    episode aborted before its first model call makes check_no_aborted discard
-    the whole group, so waiting beats failing).
+    The SDK types HTTP 429 as RateLimitException; the text match also catches
+    the account's concurrent-sandbox quota, which frees up the same way.
     """
     # In-function import, deliberately: this is the class's only use site, it
     # only runs on the failure path (where novita_sandbox is already in

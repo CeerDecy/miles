@@ -12,10 +12,7 @@ the two halves are separate and the first can be run ahead of training:
   ``ensure_task_template(...)``  build the per-task template once, under a
       deterministic name derived from the task id AND a digest of the recipe
       itself — so editing the recipe re-bakes automatically instead of
-      silently serving stale templates. The template's start command is
-      pinned to a keepalive (``sleep infinity``): the SDK otherwise inherits
-      the task image's own ENTRYPOINT/CMD as the start command, and what runs
-      in this sandbox must be the recipe's decision, not the task image's.
+      silently serving stale templates.
   ``create_task_sandbox(...)``  per-episode: start a sandbox from the
       template, exec ``server_cmd()`` as root, wait for /health on the
       sandbox's public host, return ``(sandbox, base_url)``. The sandbox
@@ -25,15 +22,6 @@ the two halves are separate and the first can be run ahead of training:
       forever.
   bake CLI (``python tb2_sandbox_novita.py ...``)  pre-build templates for a
       task list so the first training episode doesn't pay the image build.
-
-The env server's URL is ``https://8000-<sandbox id>.<domain>``: Novita's
-gateway terminates TLS and proxies HTTP and WebSocket alike, which is what
-OpenEnv's client needs (health over HTTP, the episode over ``/ws``). The URL
-carries no credential — the client has nowhere to put one — so the sandbox is
-created with the default public service access and relies on the random
-sandbox id plus its per-episode lifetime, exactly as the Modal backend does
-with its tunnel URL. ``secure`` (the SDK's own control-plane token) is left at
-the SDK default and is unrelated to that port.
 
 All novita imports are lazy (in-function), mirroring the sibling provider
 modules: offline unit tests and non-sandbox launches must not require the SDK.
@@ -65,18 +53,14 @@ from miles.rollout.agentic.rollout_limits import rollout_lock
 # are built for a root agent (their solutions and tests apt-install freely), so
 # anything less would change the task environment, not just the build.
 #
-# Novita's template parser defaults subsequent instructions to a non-root
-# ``user`` (OpenEnv's own Novita provider documents the same), which fails
-# every layer of the recipe (apt-get exits 100, /opt is not writable); and the
-# env server executes the agent's commands, so the user it runs as IS the task
-# environment's user.
+# Novita's template builder defaults to a non-root user, which fails every
+# layer of the recipe (apt-get exits 100, /opt is not writable).
 _BUILD_USER = "root"
 
-# The template's start command. Pinned so the sandbox comes up idle with port
-# 8000 free; the env server is exec'd per episode (see create_task_sandbox) so
-# runtime knobs stay runtime. The ready check is the SDK's fixed timer: there
-# is nothing to probe for a sleep.
+# template start command: unset, the SDK inherits the task image's ENTRYPOINT/CMD;
+# the env server is exec'd per episode instead (create_task_sandbox)
 _KEEPALIVE_CMD = "sleep infinity"
+# nothing to probe for a sleep, so readiness is a fixed timer
 _KEEPALIVE_READY_MS = 5_000
 
 _ENV_SERVER_PORT = 8000
@@ -160,8 +144,7 @@ def ensure_task_template(
         builder = Template().from_image(base).set_user(_BUILD_USER)
         for command in server_layer_commands(task_dir):
             builder = builder.run_cmd(command)
-        # The start command must be set last: set_start_cmd returns the final,
-        # buildable form of the template, which takes no further build steps.
+        # set_start_cmd returns the final template: no build steps after it
         template = builder.set_start_cmd(_KEEPALIVE_CMD, wait_for_timeout(_KEEPALIVE_READY_MS))
 
         def _build() -> None:
@@ -179,16 +162,13 @@ def ensure_task_template(
 
 
 def base_url(sandbox) -> str:
-    """The env server's externally reachable URL on port 8000.
+    """The env server's URL on port 8000, served over TLS by Novita's gateway.
 
-    ``get_host`` yields the per-port hostname Novita's gateway routes
-    (``{port}-{sandboxID}.{domain}``), behind TLS, so the scheme is always
-    https — and the gateway proxies WebSocket as well as HTTP, which OpenEnv's
-    client needs (health over HTTP, episode I/O over ``/ws``).
-
-    Under NOVITA_DEBUG the SDK returns ``localhost:<port>`` instead: a URL that
-    looks valid and silently targets whatever listens on the caller's machine.
-    Refuse it rather than connect to the wrong thing.
+    The gateway proxies WebSocket too, which OpenEnv's client needs for ``/ws``.
+    The URL carries no credential, so access rests on the random sandbox id and
+    the per-episode lifetime, as with Modal's tunnel URL. Under NOVITA_DEBUG the
+    SDK returns a loopback host instead, which would silently target the
+    caller's machine.
     """
     host = str(sandbox.get_host(_ENV_SERVER_PORT))
     hostname = host.rsplit(":", 1)[0]
@@ -206,10 +186,8 @@ def base_url(sandbox) -> str:
 # switch for orphans. 6 beats per window; up to 3 consecutive failed beats
 # (API blips) tolerated before the thread concludes the sandbox is gone.
 #
-# Novita caps one set_timeout at 1 hour unless the sandbox was created with the
-# `long_running` metadata marker; the TTL here is a heartbeat window rather
-# than an episode ceiling (any live episode keeps re-arming it), so the default
-# stays well under that cap and a longer episode needs no marker.
+# Novita refuses a set_timeout over 1 h without the `long_running` marker; the
+# TTL is a heartbeat window, not an episode ceiling, so the default stays under it.
 _SANDBOX_TTL_S = int(os.getenv("OPENENV_NOVITA_SANDBOX_TTL_S", "1800"))
 _READY_TIMEOUT_S = float(os.getenv("OPENENV_NOVITA_READY_TIMEOUT_S", "300"))
 _KEEPALIVE_INTERVAL_S = _SANDBOX_TTL_S / 6.0
@@ -288,12 +266,7 @@ def create_task_sandbox(
 
 
 def kill_sandbox(sandbox) -> None:
-    """Kill a sandbox created here.
-
-    The key is supplied again rather than trusted to the handle — which is this
-    module's business, not its callers' — on the same reasoning as the sibling
-    E2B module.
-    """
+    """Kill a sandbox created here, passing the key again rather than trusting the handle to carry it."""
     sandbox.kill(**_connection_opts())
 
 
